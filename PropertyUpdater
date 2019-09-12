@@ -1,0 +1,103 @@
+using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Linq.Expressions;
+
+namespace NotImportant
+{
+    public abstract class PropertyUpdater : INotifyPropertyChanged // Copied from "https://stackoverflow.com/questions/19507745/how-to-get-rid-of-repetitive-properties-in-wpf-mvvm-viewmodels"
+    {
+        //public String Prop1
+        //{
+        //    get { return GetValue(() => Prop1); }
+        //    set { SetValue(() => Prop1, value); }
+        //}
+        //public bool Bool1
+        //{
+        //    get { return GetValue(() => Bool1); }
+        //    set { SetValue(() => Bool1, value); }
+        //}
+
+        private readonly Dictionary<string, object> _propertyValueStorage;
+
+        #region Constructor
+
+        protected PropertyUpdater()
+        {
+            this._propertyValueStorage = new Dictionary<string, object>();
+        }
+
+        #endregion Constructor
+
+        protected void SetValue<T>(Expression<Func<T>> property, T value)
+        {
+            var lambdaExpression = property as LambdaExpression;
+
+            if (lambdaExpression == null)
+            {
+                throw new ArgumentException("Invalid lambda expression", "Lambda expression return value can't be null");
+            }
+
+            var propertyName = this.getPropertyName(lambdaExpression);
+            var storedValue = this.getValue<T>(propertyName);
+
+            if (object.Equals(storedValue, value)) return;
+
+            this._propertyValueStorage[propertyName] = value;
+            this.OnPropertyChanged(propertyName);
+        }
+
+        protected T GetValue<T>(Expression<Func<T>> property)
+        {
+            var lambdaExpression = property as LambdaExpression;
+
+            if (lambdaExpression == null)
+            {
+                throw new ArgumentException("Invalid lambda expression", "Lambda expression return value can't be null");
+            }
+
+            var propertyName = this.getPropertyName(lambdaExpression);
+            return getValue<T>(propertyName);
+        }
+
+        private T getValue<T>(string propertyName)
+        {
+            object value;
+            if (_propertyValueStorage.TryGetValue(propertyName, out value))
+            {
+                return (T)value;
+            }
+            return default(T);
+        }
+
+        private string getPropertyName(LambdaExpression lambdaExpression)
+        {
+            MemberExpression memberExpression;
+
+            if (lambdaExpression.Body is UnaryExpression)
+            {
+                var unaryExpression = lambdaExpression.Body as UnaryExpression;
+                memberExpression = unaryExpression.Operand as MemberExpression;
+            }
+            else
+            {
+                memberExpression = lambdaExpression.Body as MemberExpression;
+            }
+
+            return memberExpression.Member.Name;
+        }
+
+        #region < INotifyPropertyChanged > Members
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+        protected void OnPropertyChanged(string propertyName)
+        {
+            if (this.PropertyChanged != null)
+            {
+                this.PropertyChanged(this, new PropertyChangedEventArgs(propertyName));
+            }
+        }
+
+        #endregion < INotifyPropertyChanged > Members
+    }
